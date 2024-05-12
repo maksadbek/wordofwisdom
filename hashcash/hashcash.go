@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -68,9 +67,7 @@ func (h *Hashcash) Verify(payload string) bool {
 		return false
 	}
 
-	sha := sha1.New()
-	io.WriteString(sha, payload)
-	hash := sha.Sum(nil)
+	hash := sha1.Sum([]byte(payload))
 
 	// zero bits may not be multiply of bytes(8bits)
 	zbits := layout.Bits

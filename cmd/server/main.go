@@ -10,8 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/maksadbek/wordofwisdom/proofofwork"
-	"github.com/maksadbek/wordofwisdom/proofofwork/hashcash"
+	"github.com/maksadbek/wordofwisdom/hashcash"
 )
 
 var (
@@ -19,7 +18,7 @@ var (
 )
 
 type App struct {
-	verifier proofofwork.Verifier
+	verifier *hashcash.Hashcash
 	qdb      *quotedb
 }
 

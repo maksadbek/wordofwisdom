@@ -9,8 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/maksadbek/wordofwisdom/proofofwork"
-	"github.com/maksadbek/wordofwisdom/proofofwork/hashcash"
+	"github.com/maksadbek/wordofwisdom/hashcash"
 )
 
 var (
@@ -19,7 +18,7 @@ var (
 )
 
 type App struct {
-	generator proofofwork.Generator
+	generator *hashcash.Hashcash
 }
 
 var app = App{

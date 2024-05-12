@@ -1,0 +1,15 @@
+version: "3.0"
+
+services:
+  server:
+    build: .
+    environment:
+      ADDR: ':1313'
+    ports:
+      - "1313:1313"
+
+  client:
+    build: .
+    environment:
+      ADDR: 'server:1313'
+      ID: 'username'

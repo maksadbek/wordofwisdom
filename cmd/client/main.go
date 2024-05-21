@@ -3,9 +3,9 @@ package main
 import (
 	"bufio"
 	"context"
-	"io"
 	"log"
 	"net"
+	"net/textproto"
 	"os"
 	"time"
 
@@ -14,7 +14,6 @@ import (
 
 var (
 	addr = os.Getenv("ADDR")
-	id   = os.Getenv("ID")
 )
 
 type App struct {
@@ -26,7 +25,7 @@ var app = App{
 }
 
 func main() {
-	if addr == "" || id == "" {
+	if addr == "" {
 		log.Fatal("please set ADDR and ID")
 		return
 	}
@@ -42,28 +41,38 @@ func main() {
 
 	defer conn.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*10)
-	defer cancel()
+	r := textproto.NewReader(bufio.NewReader(conn))
+	w := textproto.NewWriter(bufio.NewWriter(conn))
+
+	err = w.PrintfLine("CHALLENGE")
+	if err != nil {
+		panic(err)
+	}
+
+	challenge, err := r.ReadLine()
+	if err != nil {
+		panic(err)
+	}
+
+	log.Printf("received message: %q", challenge)
 
 	now := time.Now()
-	token, err := app.generator.Generate(ctx, id)
+	token, err := app.generator.Generate(context.Background(), challenge)
 	if err != nil {
 		log.Fatal("failed to generate token", err)
 	}
 
 	log.Printf("generated a token in %v: %q", time.Since(now), token)
 
-	_, err = io.WriteString(conn, token+"\n")
+	err = w.PrintfLine("GETQUOTE %v", token)
 	if err != nil {
-		log.Fatal("failed to send token", err)
+		panic(err)
 	}
 
-	message, err := bufio.NewReader(conn).ReadString('\n')
+	quote, err := r.ReadLine()
 	if err != nil {
-		log.Println("failed to read from conn:", err)
-		return
+		panic(err)
 	}
 
-	message = message[:len(message)-1]
-	log.Printf("received message: %q", message)
+	log.Printf("received quote: %q", quote)
 }

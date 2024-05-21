@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"strconv"
 	"strings"
@@ -15,7 +16,8 @@ import (
 )
 
 const (
-	hashFormat  = "X-Hashcash: %v:%v:%v:%v:%v:%v:%v"
+	hashPrefix  = "X-Hashcash:"
+	hashFormat  = hashPrefix + "%v:%v:%v:%v:%v:%v:%v"
 	hashVersion = 1
 
 	timeFormatFull    = "060102150405"
@@ -24,8 +26,10 @@ const (
 	timeFormatDate    = "060102"
 )
 
-var ErrInvalidPayload = errors.New("invalid payload")
-var ErrTimeout = errors.New("timeout")
+var (
+	ErrInvalidPayload = errors.New("invalid payload")
+	ErrTimeout        = errors.New("timeout")
+)
 
 type Hashcash struct {
 	timeFunc func() time.Time
@@ -57,14 +61,15 @@ func NewHashcash(tfn timeFunc, prng prngFunc, bits int, period time.Duration) *H
 	}
 }
 
-func (h *Hashcash) Verify(payload string) bool {
+func (h *Hashcash) Verify(payload string) (string, bool) {
 	layout, err := h.parse(payload)
 	if err != nil {
-		return false
+		log.Println("failed to parse payload", err)
+		return "", false
 	}
 
 	if layout.Datetime.Before(h.timeFunc().Add(-h.period)) {
-		return false
+		return "", false
 	}
 
 	hash := sha1.Sum([]byte(payload))
@@ -75,7 +80,7 @@ func (h *Hashcash) Verify(payload string) bool {
 	zbytes := int(zbits / 8)
 	for i := range zbytes {
 		if hash[i] != 0x00 {
-			return false
+			return "", false
 		}
 	}
 
@@ -83,11 +88,11 @@ func (h *Hashcash) Verify(payload string) bool {
 	if zrembits > 0 {
 		rembyte := hash[zbytes]
 		if rembyte>>(8-zrembits) != 0 {
-			return false
+			return "", false
 		}
 	}
 
-	return true
+	return layout.Resource, true
 }
 
 func (h *Hashcash) Generate(ctx context.Context, resource string) (string, error) {
@@ -111,7 +116,7 @@ func (h *Hashcash) Generate(ctx context.Context, resource string) (string, error
 			base64.StdEncoding.EncodeToString(binary.AppendVarint(nil, int64(cnt))),
 		)
 
-		if h.Verify(payload) {
+		if _, ok := h.Verify(payload); ok {
 			return payload, nil
 		}
 	}
@@ -119,9 +124,11 @@ func (h *Hashcash) Generate(ctx context.Context, resource string) (string, error
 }
 
 func (h *Hashcash) parse(payload string) (*Layout, error) {
-	signature := "X-Hashcash: "
+	if len(payload) < len(hashPrefix) {
+		return nil, fmt.Errorf("invalid payload %q", payload)
+	}
 
-	chunks := strings.Split(payload[len(signature):], ":")
+	chunks := strings.Split(payload[len(hashPrefix):], ":")
 	if len(chunks) != 7 {
 		return nil, ErrInvalidPayload
 	}
